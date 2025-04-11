@@ -1,51 +1,85 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 import random
-import json
-import os
+import mysql.connector
+import requests
 
 app = Flask(__name__)
 CORS(app)
 
-# Função para simular a leitura dos sensores
+# === Configurações ===
+THINGSPEAK_API_KEY = 'SUA_CHAVE_API'
+THINGSPEAK_URL = 'https://api.thingspeak.com/update'
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': 'sua_senha',
+    'database': 'monitoramento'
+}
+
+# === Simulação dos sensores ===
 def get_sensor_data():
     return {
         "temperatura": round(random.uniform(20, 80), 2),
         "umidade": round(random.uniform(30, 90), 2),
-        "pressao": round(random.uniform(900, 1100), 2),
-        "luminosidade": round(random.uniform(100, 1000), 2),
-        "vento": round(random.uniform(0, 10), 2)
+        "presença": round(random.uniform(900, 1100), 2),
+        "tensão eletrica": round(random.uniform(100, 1000), 2),
     }
 
-# Carregar dados do sensores.json
-def load_data():
-    if os.path.exists('sensores.json'):
-        with open('sensores.json', 'r') as f:
-            return json.load(f)
-    return {}
+# === Salvar no MySQL ===
+def save_to_db(data):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+    sql = """
+        INSERT INTO sensores (temperatura, umidade, presenca, tensao_eletrica)
+        VALUES (%s, %s, %s, %s)
+    """
+    valores = (
+        data["temperatura"],
+        data["umidade"],
+        data["presença"],
+        data["tensão eletrica"]
+    )
+    cursor.execute(sql, valores)
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-# Salvar dados no sensores.json
-def save_data(data):
-    with open('sensores.json', 'w') as f:
-        json.dump(data, f)
+# === Enviar para o ThingSpeak ===
+def send_to_thingspeak(data):
+    payload = {
+        'api_key': THINGSPEAK_API_KEY,
+        'field1': data['temperatura'],
+        'field2': data['umidade'],
+        'field3': data['presença'],
+        'field4': data['tensão eletrica']
+    }
+    try:
+        requests.get(THINGSPEAK_URL, params=payload)
+    except Exception as e:
+        print("Erro ao enviar para o ThingSpeak:", e)
 
+# === Rota principal ===
 @app.route('/sensores', methods=['GET'])
 def sensores():
     sensor_data = get_sensor_data()
-    data = load_data()
-    data.update(sensor_data)
+    
+    # Persistência
+    save_to_db(sensor_data)
 
-    # Salvar os dados no arquivo JSON
-    save_data(data)
+    # Enviar para o ThingSpeak a cada 15s (frontend vai chamar sempre, então backend envia a cada 3ª vez)
+    sensores.counter = getattr(sensores, "counter", 0) + 1
+    if sensores.counter % 3 == 0:
+        send_to_thingspeak(sensor_data)
 
-    # Verificar alertas
+    # Verificação de alertas
     alerts = []
     if sensor_data["temperatura"] > 75:
         alerts.append("Temperatura crítica!")
     if sensor_data["umidade"] < 35:
         alerts.append("Umidade baixa!")
-    if sensor_data["pressao"] < 950:
-        alerts.append("Pressão baixa!")
+    if sensor_data["presença"] < 950:
+        alerts.append("Não tem ninguém presente!")
 
     return jsonify({
         "data": sensor_data,

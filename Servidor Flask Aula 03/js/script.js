@@ -1,69 +1,109 @@
+const tempSpan = document.getElementById("temp");
+const humSpan = document.getElementById("hum");
+const presSpan = document.getElementById("pres");
+const lumSpan = document.getElementById("lum");
+const alertsDiv = document.getElementById("alerts");
+const toggleButton = document.getElementById("toggleButton");
+
+let intervalId = null;
+
+// Gráfico Chart.js
 const ctx = document.getElementById('sensorChart').getContext('2d');
-const chart = new Chart(ctx, {
+const sensorChart = new Chart(ctx, {
     type: 'line',
     data: {
-        labels: [],
+        labels: [], // Horários
         datasets: [
-            { label: 'Temperatura (ºC)', data: [], borderColor: 'red', fill: false },
-            { label: 'Umidade (%)', data: [], borderColor: 'blue', fill: false },
-            { label: 'Pressão (hPa)', data: [], borderColor: 'green', fill: false },
-            { label: 'Luminosidade (lux)', data: [], borderColor: 'yellow', fill: false },
-            { label: 'Vento (m/s)', data: [], borderColor: 'purple', fill: false }
+            {
+                label: 'Temperatura (ºC)',
+                data: [],
+                borderColor: 'red',
+                fill: false
+            },
+            {
+                label: 'Umidade (%)',
+                data: [],
+                borderColor: 'blue',
+                fill: false
+            },
+            {
+                label: 'Presença',
+                data: [],
+                borderColor: 'green',
+                fill: false
+            },
+            {
+                label: 'Tensão Elétrica (V)',
+                data: [],
+                borderColor: 'orange',
+                fill: false
+            }
         ]
     },
     options: {
         responsive: true,
         scales: {
-            x: { title: { display: true, text: 'Tempo' } }
+            x: {
+                title: {
+                    display: true,
+                    text: 'Horário'
+                }
+            },
+            y: {
+                beginAtZero: true
+            }
         }
     }
 });
 
-let intervalo;
-let leituraAtiva = false;
-
-document.getElementById('toggleButton').addEventListener('click', function() {
-    if (leituraAtiva) {
-        clearInterval(intervalo);
-        document.getElementById('toggleButton').innerText = 'Iniciar Leitura';
-    } else {
-        intervalo = setInterval(atualizarSensores, 2000);
-        document.getElementById('toggleButton').innerText = 'Pausar Leitura';
-    }
-    leituraAtiva = !leituraAtiva;
-});
-
-async function atualizarSensores() {
+// Função para buscar os dados
+async function fetchSensorData() {
     try {
-        const response = await fetch('http://127.0.0.1:5000/sensores');
-        const data = await response.json();
+        const response = await fetch('http://localhost:5000/sensores');
+        const json = await response.json();
+        const data = json.data;
+        const alerts = json.alerts;
 
-        // Atualiza os valores no HTML
-        document.getElementById('temp').innerText = data.data.temperatura;
-        document.getElementById('hum').innerText = data.data.umidade;
-        document.getElementById('pres').innerText = data.data.pressao;
-        document.getElementById('lum').innerText = data.data.luminosidade;
-        document.getElementById('vento').innerText = data.data.vento;
-
-        // Exibe os alertas, se houver
-        document.getElementById('alerts').innerHTML = data.alerts.map(alert => `<p>${alert}</p>`).join('');
-
-        // Atualiza o gráfico
         const now = new Date().toLocaleTimeString();
-        chart.data.labels.push(now);
-        chart.data.datasets[0].data.push(data.data.temperatura);
-        chart.data.datasets[1].data.push(data.data.umidade);
-        chart.data.datasets[2].data.push(data.data.pressao);
-        chart.data.datasets[3].data.push(data.data.luminosidade);
-        chart.data.datasets[4].data.push(data.data.vento);
 
-        if (chart.data.labels.length > 10) {
-            chart.data.labels.shift();
-            chart.data.datasets.forEach(dataset => dataset.data.shift());
+        tempSpan.textContent = data.temperatura;
+        humSpan.textContent = data.umidade;
+        presSpan.textContent = data.presença;
+        lumSpan.textContent = data["tensão eletrica"];
+
+        alertsDiv.innerHTML = alerts.length > 0
+            ? `<p style="color:red;">${alerts.join("<br>")}</p>`
+            : `<p style="color:green;">Todos os sensores estão dentro dos limites.</p>`;
+
+        // Atualizar o gráfico
+        sensorChart.data.labels.push(now);
+        sensorChart.data.datasets[0].data.push(data.temperatura);
+        sensorChart.data.datasets[1].data.push(data.umidade);
+        sensorChart.data.datasets[2].data.push(data.presença);
+        sensorChart.data.datasets[3].data.push(data["tensão eletrica"]);
+
+        // Limitar a quantidade de pontos no gráfico (opcional)
+        if (sensorChart.data.labels.length > 10) {
+            sensorChart.data.labels.shift();
+            sensorChart.data.datasets.forEach(dataset => dataset.data.shift());
         }
 
-        chart.update();
+        sensorChart.update();
     } catch (error) {
         console.error("Erro ao buscar dados:", error);
+        alertsDiv.innerHTML = `<p style="color:darkred;">Erro ao buscar dados do servidor.</p>`;
     }
 }
+
+// Botão de iniciar/parar leitura
+toggleButton.addEventListener("click", () => {
+    if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+        toggleButton.textContent = "Iniciar Leitura";
+    } else {
+        fetchSensorData(); // disparar já o primeiro
+        intervalId = setInterval(fetchSensorData, 5000); // a cada 5 segundos
+        toggleButton.textContent = "Parar Leitura";
+    }
+});
