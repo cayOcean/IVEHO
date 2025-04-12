@@ -59,7 +59,7 @@ const sensorChart = new Chart(ctx, {
 // Função para buscar os dados
 async function fetchSensorData() {
     try {
-        const response = await fetch('http://localhost:5000/sensores');
+        const response = await fetch('http://localhost:5000/sensores'); // Alterado para a URL correta
         const json = await response.json();
         const data = json.data;
         const alerts = json.alerts;

@@ -1,0 +1,17 @@
+# Usa uma imagem base do Python (versão 3.9 slim, mais leve)
+FROM python:3.9-slim
+
+# Define o diretório de trabalho dentro do container como /app
+WORKDIR /app
+
+# Copia o arquivo requirements.txt para o container
+COPY requirements.txt .
+
+# Instala as dependências Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copia o restante dos arquivos da aplicação
+COPY app/ .
+
+# Comando padrão ao iniciar o container
+CMD ["python", "app.py"]
