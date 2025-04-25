@@ -26,12 +26,17 @@
     // Função para buscar os dados dos sensores via API
     function fetchSensorData() {
         fetch('/sensores')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao buscar dados do servidor');
+            }
+            return response.json();
+        })
         .then(data => {
             const temperatura = data.data.temperatura;
             const umidade = data.data.umidade;
             const presenca = data.data.presenca;
-            const tensao = data.data['tensão eletrica'];
+            const tensao = data.data['tensão_eletrica'];
 
             // Atualizar os valores na página
             document.getElementById('temp').textContent = temperatura + ' ºC';
@@ -41,6 +46,10 @@
 
             // Atualizar os gráficos
             updateCharts(temperatura, umidade, presenca, tensao);
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            document.getElementById('alerts').textContent = 'Erro ao buscar dados do servidor.';
         });
     }
 

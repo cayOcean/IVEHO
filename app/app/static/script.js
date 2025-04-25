@@ -56,6 +56,23 @@ const sensorChart = new Chart(ctx, {
     }
 });
 
+// Função para enviar dados para o ThingSpeak
+async function sendDataToThingSpeak(temperatura, umidade, presenca, tensao) {
+    const apiKey = 'MLGZ3GKY4QDDNF8J'; // Substitua pela sua chave de escrita
+    const url = `https://api.thingspeak.com/update?api_key=${apiKey}&field1=${temperatura}&field2=${umidade}&field3=${presenca}&field4=${tensao}`;
+
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            console.log('Dados enviados com sucesso para o ThingSpeak');
+        } else {
+            console.error('Erro ao enviar dados para o ThingSpeak');
+        }
+    } catch (error) {
+        console.error('Erro na requisição para o ThingSpeak:', error);
+    }
+}
+
 // Função para buscar os dados
 async function fetchSensorData() {
     try {
@@ -68,9 +85,10 @@ async function fetchSensorData() {
 
         tempSpan.textContent = data.temperatura;
         humSpan.textContent = data.umidade;
-        presSpan.textContent = data.presença;
-        lumSpan.textContent = data["tensão eletrica"];
+        presSpan.textContent = data.presenca;
+        lumSpan.textContent = data["tensao_eletrica"]; // Ajustado para 'tensao_eletrica'
 
+        // Mostrar alertas
         alertsDiv.innerHTML = alerts.length > 0
             ? `<p style="color:red;">${alerts.join("<br>")}</p>`
             : `<p style="color:green;">Todos os sensores estão dentro dos limites.</p>`;
@@ -79,8 +97,8 @@ async function fetchSensorData() {
         sensorChart.data.labels.push(now);
         sensorChart.data.datasets[0].data.push(data.temperatura);
         sensorChart.data.datasets[1].data.push(data.umidade);
-        sensorChart.data.datasets[2].data.push(data.presença);
-        sensorChart.data.datasets[3].data.push(data["tensão eletrica"]);
+        sensorChart.data.datasets[2].data.push(data.presenca);
+        sensorChart.data.datasets[3].data.push(data["tensao_eletrica"]);
 
         // Limitar a quantidade de pontos no gráfico (opcional)
         if (sensorChart.data.labels.length > 10) {
@@ -89,6 +107,10 @@ async function fetchSensorData() {
         }
 
         sensorChart.update();
+
+        // Enviar dados para o ThingSpeak
+        sendDataToThingSpeak(data.temperatura, data.umidade, data.presenca, data["tensao_eletrica"]);
+
     } catch (error) {
         console.error("Erro ao buscar dados:", error);
         alertsDiv.innerHTML = `<p style="color:darkred;">Erro ao buscar dados do servidor.</p>`;
@@ -102,7 +124,7 @@ toggleButton.addEventListener("click", () => {
         intervalId = null;
         toggleButton.textContent = "Iniciar Leitura";
     } else {
-        fetchSensorData(); // disparar já o primeiro
+        fetchSensorData(); // Disparar já o primeiro
         intervalId = setInterval(fetchSensorData, 5000); // a cada 5 segundos
         toggleButton.textContent = "Parar Leitura";
     }
